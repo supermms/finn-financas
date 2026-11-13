@@ -403,10 +403,11 @@ function txRow(g, showDate){
 }
 function cashRow(it, opts){
   const g = it.g, k = it.card, dm = g.data.slice(8)+'/'+g.data.slice(5,7);
-  if(g.entrada) return `<button class="tx" data-eedit="${g.id}"><span class="ic" style="background:var(--green-l)">💰</span><span class="n"><b>${esc(g.descricao)}</b><small>Entrada · ${dm}</small></span><span class="v pos">+ ${fmt(g.valor)}</span></button>`;
+  const nd = opts && opts.noDate;
+  if(g.entrada) return `<button class="tx" data-eedit="${g.id}"><span class="ic" style="background:var(--green-l)">💰</span><span class="n"><b>${esc(g.descricao)}</b><small>Entrada${nd?'':' · '+dm}</small></span><span class="v pos">+ ${fmt(g.valor)}</span></button>`;
   let sub;
-  if(k){ sub = `${it.n>1?`parcela ${it.i}/${it.n} · `:''}compra ${dm}${opts&&opts.futura?` · fatura ${mLabel(it.due)}`:''}`; if(opts&&opts.showCard) sub = esc(cname(k))+' · '+sub; }
-  else sub = `${esc(metodoLabel(g.metodo))} · ${dm}`;
+  if(k){ sub = [opts&&opts.showCard?esc(cname(k)):'', it.n>1?`parcela ${it.i}/${it.n}`:'', nd?'':'compra '+dm, opts&&opts.futura?`fatura ${mLabel(it.due)}`:''].filter(Boolean).join(' · '); }
+  else sub = esc(metodoLabel(g.metodo)) + (nd?'':' · '+dm);
   if(g.rec) sub = '🔁 ' + sub;
   const val = it.v, tot = it.n>1 ? `<small class="lbl" style="display:block;font-weight:400;text-align:right">de ${fmt(g.valor)}</small>` : '';
   return `<button class="tx" ${g.rec?`data-redit="${g.rid}"`:`data-gedit="${g.id}"`}><span class="ic">${catOf(g.cat).i}</span><span class="n"><b>${esc(g.descricao)}</b><small>${esc(g.cat)} · ${sub}</small></span><span class="v" style="text-align:right">${fmt(val)}${tot}</span></button>`;
@@ -433,7 +434,18 @@ function lancListHTML(c){
   const recOk = it => f!=='recorrentes' || it.g.rec;
   const sec = (icon, title, right, rows, extra) => rows ? `<div class="lsec"><div class="lsec-h"><span>${icon} ${title}</span><b>${right}</b></div>${extra||''}${rows}</div>` : '';
   let html = '';
-  if(f==='todos' || f==='recorrentes' || cardById(f)){
+  if(f==='todos'){
+    const all = [...cm.cards.flatMap(x=>x.items), ...cm.avulsos, ...cm.entradas].sort(byDateDesc);
+    let last='';
+    all.forEach(it=>{
+      const ds = it.g.data;
+      if(ds!==last){ last=ds; const [y,m,d]=ds.split('-').map(Number); const wd=new Date(y,m-1,d).toLocaleDateString('pt-BR',{weekday:'short'}).replace('.',''); html += `<div class="dgrp">${ds===todayStr?'Hoje':wd+', '+pad(d)+'/'+pad(m)}${ds.slice(0,7)!==keyOf(V)?' · fatura deste mês':''}${ds>todayStr?' · previsto':''}</div>`; }
+      html += cashRow(it, {showCard:true, noDate:true});
+    });
+    const ajs = cm.cards.filter(x=>x.aj);
+    if(ajs.length) html += `<div class="dgrp">Lançado fora do app</div>` + ajs.map(x=>`<div class="tx" style="cursor:default"><span class="ic">💳</span><span class="n"><b>Fatura ${esc(cname(x.k))}</b><small>valor informado em Ajustes → Cartões</small></span><span class="v">${fmt(x.aj)}</span></div>`).join('');
+  }
+  if(f==='recorrentes' || cardById(f)){
     cm.cards.filter(x=>f==='todos'||f==='recorrentes'||x.k.id===f).forEach(x=>{
       const items = x.items.filter(recOk).sort(byDateDesc);
       const tot = r2(x.items.reduce((a,b)=>a+b.v,0) + x.aj);
@@ -441,11 +453,11 @@ function lancListHTML(c){
       html += sec('💳', `Fatura ${esc(cname(x.k))} <span class="lbl">· vence ${pad(x.k.dia)}/${pad(V%12+1)}</span>`, fmt(tot), rows);
     });
   }
-  if(f==='todos' || f==='recorrentes' || METODOS[f]){
+  if(f==='recorrentes' || METODOS[f]){
     const items = cm.avulsos.filter(it=>(f==='todos'||f==='recorrentes'||it.g.metodo===f) && recOk(it)).sort(byDateDesc);
     html += sec('⚡', f==='pix'?'Pix':f==='debito'?'Débito':f==='dinheiro'?'Dinheiro':'Pix, débito e dinheiro', fmt(r2(items.reduce((a,b)=>a+b.v,0))), items.map(it=>cashRow(it)).join(''));
   }
-  if(f==='todos' || f==='entradas'){
+  if(f==='entradas'){
     const items = cm.entradas.sort(byDateDesc);
     html += sec('💰', 'Entradas extras', '+ '+fmt(r2(items.reduce((a,b)=>a+b.g.valor,0))), items.map(it=>cashRow(it)).join(''));
   }

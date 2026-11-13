@@ -622,7 +622,7 @@ function proxHTML(V){
 
 /* ---------- modals ---------- */
 const catSel = (attr, v) => `<select class="in" ${attr}>${CATLIST.map(k=>`<option value="${k}" ${k===v?'selected':''}>${catOf(k).i} ${k}</option>`).join('')}</select>`;
-const valorBig = (ff, val, ph) => `<div style="display:flex;align-items:center;gap:6px;border-bottom:2px solid var(--line)"><span style="font-size:22px;font-weight:700;color:var(--soft)">R$</span><input class="bigin" id="fValor" data-ff="${ff}" inputmode="decimal" placeholder="${ph||'0,00'}" value="${esc(val)}"></div>`;
+const valorBig = (ff, val, ph) => `<div style="display:flex;align-items:center;gap:6px;border-bottom:2px solid var(--line)"><span style="font-size:22px;font-weight:700;color:var(--soft)">R$</span><input class="bigin" id="fValor" data-ff="${ff}" inputmode="numeric" pattern="[0-9]*" data-money autocomplete="off" placeholder="${ph||'0,00'}" value="${esc(val)}"></div>`;
 const metodoChips = sel => [...Object.entries(METODOS).map(([id,m])=>({id, l:m.i+' '+m.l})), ...S.cartoes.map(c=>({id:c.id, l:'💳 '+cname(c)}))].map(m=>`<button class="chipb ${sel===m.id?'on':''}" data-pm="${m.id}">${esc(m.l)}</button>`).join('');
 function modalHTML(){ return ui.modal==='edit'?editHTML():ui.modal==='add'?addHTML():ui.modal==='mes'?mesHTML():ui.modal==='conta'?contaHTML():ui.modal==='rec'?recModalHTML():''; }
 function editHTML(){
@@ -631,12 +631,12 @@ function editHTML(){
   let body = '';
   if(t==='renda') body = `${!S.nome?'<div class="hint" style="margin-bottom:14px">👋 Bem-vinda! Comece pelo seu nome e salário. Depois cadastre seus cartões e contas fixas nas outras abas.</div>':''}
     <label class="fld"><span>Seu nome</span><input class="in" data-f="nome" value="${esc(D.nome)}"></label>
-    <label class="fld"><span>Salário padrão a partir de ${MESES[ui.m].toLowerCase()} ${ui.y}</span><input class="in" inputmode="decimal" data-n="renda.salarioEdit" value="${fmtN(salPadrao(VIDX(),D))}"></label>
+    <label class="fld"><span>Salário padrão a partir de ${MESES[ui.m].toLowerCase()} ${ui.y}</span><input class="in" inputmode="numeric" pattern="[0-9]*" data-money autocomplete="off" data-n="renda.salarioEdit" value="${fmtN(salPadrao(VIDX(),D))}"></label>
     <p class="lbl">Meses anteriores mantêm o valor que tinham. Pra mudar só um mês ou lançar extras (13º, freela), use “Editar” na renda do mês, no card de saldo.</p>`;
   if(t==='contas') body = `<div class="erow casa head"><span>Conta</span><span>Valor</span><span>Categoria</span><span>Dia</span><span></span><span></span></div>` +
     D.contas.map((x,i)=>`<div class="erow casa">
       <input class="in" data-a="contas.${i}.nome" value="${esc(x.nome)}">
-      <input class="in" inputmode="decimal" data-an="contas.${i}.valor" value="${fmtN(x.valor)}">
+      <input class="in" inputmode="numeric" pattern="[0-9]*" data-money autocomplete="off" data-an="contas.${i}.valor" value="${fmtN(x.valor)}">
       <span class="w">${catSel(`data-a="contas.${i}.cat"`, x.cat)}</span>
       <input class="in d" inputmode="numeric" data-an="contas.${i}.dia" value="${x.dia}">
       <span class="mo"></span>
@@ -647,9 +647,9 @@ function editHTML(){
       <label class="fld"><span>Nome do cartão</span><input class="in" data-a="cartoes.${i}.nome" value="${esc(k.nome)}"></label>
       <label class="fld"><span>Fecha dia</span><input class="in" inputmode="numeric" data-an="cartoes.${i}.fecha" value="${k.fecha}"></label>
       <label class="fld"><span>Vence dia</span><input class="in" inputmode="numeric" data-an="cartoes.${i}.dia" value="${k.dia}"></label>
-      <label class="fld"><span>Limite total</span><input class="in" inputmode="decimal" data-an="cartoes.${i}.limite" value="${fmtN(k.limite||0)}"></label>
+      <label class="fld"><span>Limite total</span><input class="in" inputmode="numeric" pattern="[0-9]*" data-money autocomplete="off" data-an="cartoes.${i}.limite" value="${fmtN(k.limite||0)}"></label>
       <label class="fld"><span>Cor</span><input class="in" type="color" style="height:40px;padding:4px" data-a="cartoes.${i}.cor" value="${esc(k.cor)}"></label>
-      <label class="fld" style="grid-column:span 2"><span>Já na fatura de ${MESES[ui.m].toLowerCase()} fora do app (opcional)</span><input class="in" inputmode="decimal" data-an="ajustes.${K}.${k.id}" value="${fmtN(D.ajustes[K][k.id]||0)}"></label>
+      <label class="fld" style="grid-column:span 2"><span>Já na fatura de ${MESES[ui.m].toLowerCase()} fora do app (opcional)</span><input class="in" inputmode="numeric" pattern="[0-9]*" data-money autocomplete="off" data-an="ajustes.${K}.${k.id}" value="${fmtN(D.ajustes[K][k.id]||0)}"></label>
       <button class="btn ghost sm" style="grid-column:span 2;justify-content:center;color:var(--pink)" data-del="cartoes.${i}">Remover cartão</button></div>`).join('') +
     `<button class="btn ghost sm" data-new="cartoes">+ Cartão</button><p class="lbl" style="margin-top:10px">Compras lançadas no app entram sozinhas na fatura certa, pelo dia de fechamento.</p>`;
   if(t==='recorrentes') body = (S.recorrentes.length ? S.recorrentes.map(r=>`<button class="tx" data-redit="${r.id}"><span class="ic">${catOf(r.cat).i}</span><span class="n"><b>${esc(r.descricao)}</b><small>🔁 dia ${pad(r.dia)} · ${esc(metodoLabel(r.metodo))} · desde ${mLabel(r.desde)}${r.ate!=null?' até '+mLabel(r.ate):''}</small></span><span class="v">${fmt(r.valor)}</span></button>`).join('') : '<div class="empty">Nenhum recorrente ainda.</div>') +
@@ -659,7 +659,7 @@ function editHTML(){
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-backup>⬇ Fazer backup agora</button><label class="btn ghost" style="cursor:pointer">⬆ Restaurar backup<input type="file" accept="application/json,.json" id="fRestore" hidden></label></div>
     <p class="lbl" style="margin-top:14px">Restaurar substitui os dados atuais deste aparelho pelos do arquivo.</p>`;
   if(t==='limites') body = `<p class="lbl" style="margin-bottom:10px">Defina quanto quer gastar no máximo por mês em cada categoria. Deixe em branco pra não ter limite. Você recebe um aviso ao chegar em 80% e ao passar do limite.</p>` +
-    CATLIST.map(k=>`<div class="erow" style="grid-template-columns:1fr 130px"><span>${catOf(k).i} ${k}</span><input class="in" inputmode="decimal" placeholder="sem limite" data-lim="${k}" value="${D.limites[k]?fmtN(D.limites[k]):''}"></div>`).join('');
+    CATLIST.map(k=>`<div class="erow" style="grid-template-columns:1fr 130px"><span>${catOf(k).i} ${k}</span><input class="in" inputmode="numeric" pattern="[0-9]*" data-money autocomplete="off" placeholder="sem limite" data-lim="${k}" value="${D.limites[k]?fmtN(D.limites[k]):''}"></div>`).join('');
   return `<div class="modal" role="dialog" aria-label="Ajustes">
     <div class="mh"><b>Ajustes</b><button class="x" data-close aria-label="Fechar">×</button></div>
     <div class="mtabs">${tabs.map(([k,l])=>`<button data-tab="${k}" class="${k===t?'on':''}">${l}</button>`).join('')}</div>
@@ -700,7 +700,7 @@ function addHTML(){
       <p class="lbl">Soma na renda do mês, além do salário.</p>`;
   const contaBody = `
       <label class="fld"><span>Nome</span><input class="in" data-ff="nome" placeholder="Ex.: Aluguel" value="${esc(f.nome)}"></label>
-      <div class="two"><label class="fld"><span>Valor mensal</span><input class="in" data-ff="valor" inputmode="decimal" placeholder="0,00" value="${esc(f.valor)}"></label>
+      <div class="two"><label class="fld"><span>Valor mensal</span><input class="in" data-ff="valor" inputmode="numeric" pattern="[0-9]*" data-money autocomplete="off" placeholder="0,00" value="${esc(f.valor)}"></label>
       <label class="fld"><span>Dia do vencimento</span><input class="in" data-ff="dia" inputmode="numeric" placeholder="10" value="${esc(f.dia)}"></label></div>
       <label class="fld"><span>Categoria</span>${catSel('data-ff="cat"', f.cat)}</label>`;
   return `<div class="modal" role="dialog" aria-label="Lançar" style="max-width:540px">
@@ -737,7 +737,7 @@ function mesHTML(){
       <div class="list">${c.entradasL.map(e=>`<div class="it"><span>💰</span><span class="n">${esc(e.descricao)} <span class="lbl">· ${e.data.slice(8)}/${e.data.slice(5,7)}</span></span><span class="v pos">+ ${fmt(e.valor)}</span><button class="x" data-edel="${e.id}" aria-label="Remover">×</button></div>`).join('') || '<div class="lbl" style="padding:6px 0">13º, freela, reembolso, venda… nada lançado ainda.</div>'}</div>
       <div class="erow" style="grid-template-columns:1fr 100px auto;border:0">
         <input class="in" data-ff="eDesc" placeholder="Ex.: Freela" value="${esc(f.eDesc||'')}">
-        <input class="in" data-ff="eValor" inputmode="decimal" placeholder="0,00" value="${esc(f.eValor||'')}">
+        <input class="in" data-ff="eValor" inputmode="numeric" pattern="[0-9]*" data-money autocomplete="off" placeholder="0,00" value="${esc(f.eValor||'')}">
         <button class="btn ghost sm" data-eadd>+ Adicionar</button>
       </div>
     </div>
@@ -819,8 +819,15 @@ function goView(v){ ui.view = VIEWS[v]?v:'visao-geral'; try{ if(location.hash.sl
 addEventListener('hashchange',()=>{ const v=hashView(); if(v!==ui.view){ ui.view=v; render(); window.scrollTo(0,0);} });
 
 /* ---------- events ---------- */
+function maskMoney(el){
+  const digits = el.value.replace(/\D/g,'').replace(/^0+/,'').slice(0,13);
+  el.value = digits ? fmtN(parseInt(digits,10)/100) : '';
+  try{ const n=el.value.length; el.setSelectionRange(n,n); }catch(_){}
+}
+document.addEventListener('focusin', e=>{ const el=e.target; if(el.hasAttribute && el.hasAttribute('data-money')){ setTimeout(()=>{ try{ const n=el.value.length; el.setSelectionRange(n,n); }catch(_){} },0); } });
 document.addEventListener('input', e=>{
   const el=e.target;
+  if(el.hasAttribute && el.hasAttribute('data-money')) maskMoney(el);
   if(el.id==='busca'){ ui.q=el.value; rebuild(); const t=$('#txl'); if(t) t.innerHTML=lancListHTML(calc(VIDX())); const ch=document.querySelector('#sec-lanc .chips'); if(ch) ch.style.display=ui.q?'none':''; const qc=document.querySelector('[data-qclear]'); if(qc) qc.style.display=ui.q?'':'none'; return; }
   if(ui.form && el.dataset.ff){ ui.form[el.dataset.ff]=el.value; const h=document.getElementById('fhint'); if(h) h.innerHTML=hintHTML(ui.form); }
 });

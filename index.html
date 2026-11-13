@@ -193,6 +193,20 @@ main{display:flex;flex-direction:column;gap:16px;min-width:0}
   .erow.casa{grid-template-columns:1fr 92px 30px;row-gap:6px}.erow.casa .w,.erow.casa .d,.erow.casa .mo{grid-row:2}.erow.head.casa{display:none}
 }
 @media(max-width:860px){.app{padding-bottom:calc(96px + env(safe-area-inset-bottom))}}
+/* fix: campos lado a lado no iPhone (input date tem largura mínima própria) */
+.two{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.two>*{min-width:0}
+.in{min-width:0;max-width:100%}
+input[type=date].in{-webkit-appearance:none;appearance:none;display:block;width:100%;min-height:42px;text-align:left;line-height:1.3}
+input[type=date].in::-webkit-date-and-time-value{text-align:left;margin:0}
+input[type=date].in::-webkit-calendar-picker-indicator{margin-left:0}
+select.in{min-height:42px;text-overflow:ellipsis}
+@media(max-width:860px){
+ .mf{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+ .mf .btn{justify-content:center;margin:0!important;white-space:nowrap}
+ .mf .btn:only-child{grid-column:1/-1}
+ .mf [data-addsave]:not([data-addsave=more]),.mf [data-savedraft],.mf [data-messave],.mf [data-csave],.mf [data-rsave]{grid-column:1/-1;order:-1;padding:13px 16px}
+}
 </style>
 </head>
 <body>
@@ -695,7 +709,7 @@ function addHTML(){
       ${editing?'':`<div class="ctog" style="margin-top:0"><button data-addtab="gasto" class="${ui.addTab==='gasto'?'on':''}">Gasto</button><button data-addtab="entrada" class="${ui.addTab==='entrada'?'on':''}">Entrada</button><button data-addtab="conta" class="${ui.addTab==='conta'?'on':''}">Conta fixa</button></div>`}
       ${ui.addTab==='gasto'?gastoBody:ui.addTab==='entrada'?entradaBody:contaBody}
     </div>
-    <div class="mf">${editing?'<button class="btn ghost" style="color:var(--pink);margin-right:auto" data-gdel>Excluir</button>':''}<button class="btn ghost" data-close>Cancelar</button>${!editing&&ui.addTab==='gasto'?'<button class="btn ghost" data-addsave="more">Salvar e lançar outro</button>':''}<button class="btn" data-addsave>${editing?'Salvar':'Adicionar'}</button></div></div>`;
+    <div class="mf">${editing?'<button class="btn ghost" style="color:var(--pink);margin-right:auto" data-gdel>Excluir</button>':''}<button class="btn ghost" data-close>Cancelar</button>${!editing&&ui.addTab==='gasto'?'<button class="btn ghost" data-addsave="more">Salvar + outro</button>':''}<button class="btn" data-addsave>${editing?'Salvar':'Adicionar'}</button></div></div>`;
 }
 function recModalHTML(){
   const f = ui.form, r = S.recorrentes.find(x=>x.id===f.id);

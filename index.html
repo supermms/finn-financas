@@ -216,6 +216,13 @@ select.in{min-height:42px;text-overflow:ellipsis}
 .swatch.on{border-color:var(--panel);box-shadow:0 0 0 2px var(--text)}
 .cards{margin-left:0!important;padding-left:0!important;scroll-padding-inline:0}
 .cards:after{content:"";flex:0 0 calc(100% - min(320px,82%) - 12px)}
+.lsec{margin-top:14px}
+.lsec-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:13px;font-weight:600;padding:6px 0;border-bottom:1px solid var(--line);margin-bottom:2px}
+.lsec-h b{white-space:nowrap}
+details.fut>summary{cursor:pointer;list-style:none;color:var(--muted)}
+details.fut>summary::-webkit-details-marker{display:none}
+details.fut>summary span:before{content:"▸ ";display:inline-block;transition:.15s}
+details.fut[open]>summary span:before{content:"▾ "}
 </style>
 </head>
 <body>
@@ -394,6 +401,25 @@ function txRow(g, showDate){
   if(showDate) sub = g.data.slice(8)+'/'+g.data.slice(5,7)+'/'+g.data.slice(2,4)+' · '+sub;
   return `<button class="tx" ${g.rec?`data-redit="${g.rid}"`:`data-gedit="${g.id}"`}><span class="ic">${catOf(g.cat).i}</span><span class="n"><b>${esc(g.descricao)}</b><small>${esc(g.cat)} · ${sub}</small></span><span class="v">${fmt(g.valor)}</span></button>`;
 }
+function cashRow(it, opts){
+  const g = it.g, k = it.card, dm = g.data.slice(8)+'/'+g.data.slice(5,7);
+  if(g.entrada) return `<button class="tx" data-eedit="${g.id}"><span class="ic" style="background:var(--green-l)">💰</span><span class="n"><b>${esc(g.descricao)}</b><small>Entrada · ${dm}</small></span><span class="v pos">+ ${fmt(g.valor)}</span></button>`;
+  let sub;
+  if(k){ sub = `${it.n>1?`parcela ${it.i}/${it.n} · `:''}compra ${dm}${opts&&opts.futura?` · fatura ${mLabel(it.due)}`:''}`; if(opts&&opts.showCard) sub = esc(cname(k))+' · '+sub; }
+  else sub = `${esc(metodoLabel(g.metodo))} · ${dm}`;
+  if(g.rec) sub = '🔁 ' + sub;
+  const val = it.v, tot = it.n>1 ? `<small class="lbl" style="display:block;font-weight:400;text-align:right">de ${fmt(g.valor)}</small>` : '';
+  return `<button class="tx" ${g.rec?`data-redit="${g.rid}"`:`data-gedit="${g.id}"`}><span class="ic">${catOf(g.cat).i}</span><span class="n"><b>${esc(g.descricao)}</b><small>${esc(g.cat)} · ${sub}</small></span><span class="v" style="text-align:right">${fmt(val)}${tot}</span></button>`;
+}
+function cashMonth(V){
+  const K = keyOf(V);
+  const avulsos = GL.filter(g=>!isCardM(g.metodo) && g.data.startsWith(K)).map(g=>({g, v:g.valor, i:1, n:1, card:null}));
+  const cards = S.cartoes.map(k=>({k, items:(CM[k.id+'|'+V]?.items||[]).map(it=>({...it, card:k})), aj:ajuste(k,V)})).filter(x=>x.items.length||x.aj);
+  const futuras = GL.filter(g=>isCardM(g.metodo) && g.data.startsWith(K)).map(g=>{ const k=cardById(g.metodo); return {g, card:k, due:dueIdx(k,g.data), i:iniParc(g), n:nParc(g), v:pvOf(g)}; }).filter(x=>x.due>V);
+  const entradas = S.entradas.filter(e=>e.data.startsWith(K)).map(e=>({g:{...e, entrada:true}}));
+  return {avulsos, cards, futuras, entradas};
+}
+const byDateDesc = (a,b)=> b.g.data.localeCompare(a.g.data) || (b.g.ts||0)-(a.g.ts||0);
 function lancListHTML(c){
   const q = ui.q.trim().toLowerCase();
   if(q){
@@ -403,30 +429,45 @@ function lancListHTML(c){
     const tot = r2(hits.filter(x=>!x.entrada).reduce((a,b)=>a+b.valor,0));
     return `<div class="lbl" style="margin:12px 0 4px">${hits.length} resultado${hits.length===1?'':'s'} em todos os meses${tot?` · gastos somam ${fmt(tot)}`:''}</div>` + (hits.map(g=>txRow(g,true)).join('') || '<div class="empty">Nada encontrado.</div>');
   }
-  const ents = c.entradasL.map(e=>({...e, entrada:true}));
-  const list = (ui.filtro==='entradas' ? ents : [...c.compras.filter(g=> ui.filtro==='todos' || g.metodo===ui.filtro || (ui.filtro==='recorrentes' && g.rec)), ...(ui.filtro==='todos'?ents:[])])
-    .sort((a,b)=> b.data.localeCompare(a.data) || (b.ts||0)-(a.ts||0));
-  let html='', last='';
-  list.forEach(g=>{
-    if(g.data!==last){ last=g.data; const [y,m,d]=g.data.split('-').map(Number); const wd=new Date(y,m-1,d).toLocaleDateString('pt-BR',{weekday:'short'}).replace('.',''); html += `<div class="dgrp">${g.data===todayStr?'Hoje':wd+', '+pad(d)+'/'+pad(m)}${g.data>todayStr?' · previsto':''}</div>`; }
-    html += txRow(g,false);
-  });
-  return html || `<div class="empty">Nada lançado ${ui.filtro==='todos'?'neste mês':'com esse filtro'}.<br><button class="btn ghost sm" style="margin:10px auto 0" data-add>+ Lançar gasto</button></div>`;
+  const V = VIDX(), cm = cashMonth(V), f = ui.filtro;
+  const recOk = it => f!=='recorrentes' || it.g.rec;
+  const sec = (icon, title, right, rows, extra) => rows ? `<div class="lsec"><div class="lsec-h"><span>${icon} ${title}</span><b>${right}</b></div>${extra||''}${rows}</div>` : '';
+  let html = '';
+  if(f==='todos' || f==='recorrentes' || cardById(f)){
+    cm.cards.filter(x=>f==='todos'||f==='recorrentes'||x.k.id===f).forEach(x=>{
+      const items = x.items.filter(recOk).sort(byDateDesc);
+      const tot = r2(x.items.reduce((a,b)=>a+b.v,0) + x.aj);
+      const rows = items.map(it=>cashRow(it)).join('') + (x.aj && f!=='recorrentes' ? `<div class="tx" style="cursor:default"><span class="ic">💳</span><span class="n"><b>Lançado fora do app</b><small>valor informado em Ajustes → Cartões</small></span><span class="v">${fmt(x.aj)}</span></div>` : '');
+      html += sec('💳', `Fatura ${esc(cname(x.k))} <span class="lbl">· vence ${pad(x.k.dia)}/${pad(V%12+1)}</span>`, fmt(tot), rows);
+    });
+  }
+  if(f==='todos' || f==='recorrentes' || METODOS[f]){
+    const items = cm.avulsos.filter(it=>(f==='todos'||f==='recorrentes'||it.g.metodo===f) && recOk(it)).sort(byDateDesc);
+    html += sec('⚡', f==='pix'?'Pix':f==='debito'?'Débito':f==='dinheiro'?'Dinheiro':'Pix, débito e dinheiro', fmt(r2(items.reduce((a,b)=>a+b.v,0))), items.map(it=>cashRow(it)).join(''));
+  }
+  if(f==='todos' || f==='entradas'){
+    const items = cm.entradas.sort(byDateDesc);
+    html += sec('💰', 'Entradas extras', '+ '+fmt(r2(items.reduce((a,b)=>a+b.g.valor,0))), items.map(it=>cashRow(it)).join(''));
+  }
+  if(f==='todos' || f==='recorrentes' || cardById(f)){
+    const items = cm.futuras.filter(it=>(f==='todos'||f==='recorrentes'||it.card.id===f) && recOk(it)).sort(byDateDesc);
+    if(items.length) html += `<details class="lsec fut" ${ui.futOpen?'open':''}><summary class="lsec-h"><span>🕒 Compras deste mês em faturas futuras</span><b>${fmt(r2(items.reduce((a,b)=>a+b.v,0)))}</b></summary><div class="lbl" style="margin:2px 0 6px">Não entram no desembolso de ${MESES[V%12].toLowerCase()}.</div>${items.map(it=>cashRow(it,{futura:true, showCard:true})).join('')}</details>`;
+  }
+  return html || `<div class="empty">Nada a desembolsar ${f==='todos'?'neste mês':'com esse filtro'}.<br><button class="btn ghost sm" style="margin:10px auto 0" data-add>+ Lançar gasto</button></div>`;
 }
 function lancHTML(c){
   const chips = [['todos','Todos'],['pix','⚡ Pix'],['debito','🏦 Débito'],['dinheiro','💵 Dinheiro'],...S.cartoes.map(k=>[k.id,'💳 '+k.banco]),['recorrentes','🔁 Recorrentes'],['entradas','💰 Entradas']];
-  const compras = c.compras;
-  const tot = r2(compras.reduce((a,b)=>a+b.valor,0));
-  const tCard = r2(compras.filter(g=>isCardM(g.metodo)).reduce((a,b)=>a+b.valor,0));
+  const fat = r2(c.varCard + c.ajTot), av = c.varAvulso, tot = r2(fat + av);
   const full = ui.view==='lancamentos';
   return `<section class="card span2" id="sec-lanc">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div class="ttl" style="flex:1">Lançamentos <small>· ${MESES[ui.m].toLowerCase()}</small>${!full?'<button class="more" data-view="lancamentos">Ver tudo ›</button>':''}</div>${full?'<button class="btn ghost sm" data-export>⬇ Exportar CSV</button>':''}<button class="btn sm" data-add>+ Gasto</button></div>
     <div style="display:flex;gap:26px;flex-wrap:wrap;margin:14px 0 12px">
-      <div><div class="lbl">Compras do mês</div>${big(tot,26)}</div>
-      <div><div class="lbl">No cartão</div><b style="font-size:15px">${fmt(tCard)}</b></div>
-      <div><div class="lbl">Pix / débito / dinheiro</div><b style="font-size:15px">${fmt(r2(tot-tCard))}</b></div>
+      <div><div class="lbl">A desembolsar em ${MESES[ui.m].toLowerCase()}</div>${big(tot,26)}</div>
+      <div><div class="lbl">Faturas</div><b style="font-size:15px">${fmt(fat)}</b></div>
+      <div><div class="lbl">Pix / débito / dinheiro</div><b style="font-size:15px">${fmt(av)}</b></div>
       ${c.extras?`<div><div class="lbl">Entradas extras</div><b class="pos" style="font-size:15px">+ ${fmt(c.extras)}</b></div>`:''}
     </div>
+    <div class="lbl" style="margin:-6px 0 10px">Sem as contas fixas, que ficam em Contas a pagar.</div>
     ${full?`<label class="search">${ICON.search}<input id="busca" placeholder="Buscar em todos os meses (ex.: uber, mercado, nubank)" value="${esc(ui.q)}" autocomplete="off"><button class="x" data-qclear aria-label="Limpar" ${ui.q?'':'style="display:none"'}>×</button></label>`:''}
     <div class="chips" ${ui.q?'style="display:none"':''}>${chips.map(([k,l])=>`<button class="chipb ${ui.filtro===k?'on':''}" data-flt="${k}">${esc(l)}</button>`).join('')}</div>
     <div class="txl" id="txl">${lancListHTML(c)}</div>
@@ -812,7 +853,7 @@ function toast(t){ const el=$('#toast'); if(!el) return; el.innerHTML=t; el.clas
 function syncDraft(){ document.querySelectorAll('#ov [data-a]').forEach(el=>setPath(ui.draft,el.dataset.a,el.value)); document.querySelectorAll('#ov [data-f]').forEach(el=>setPath(ui.draft,el.dataset.f,el.value)); document.querySelectorAll('#ov [data-an]').forEach(el=>setPath(ui.draft,el.dataset.an,num(el.value))); document.querySelectorAll('#ov [data-n]').forEach(el=>setPath(ui.draft,el.dataset.n,num(el.value))); document.querySelectorAll('#ov [data-lim]').forEach(el=>{ const v=num(el.value); if(v>0) ui.draft.limites[el.dataset.lim]=v; else delete ui.draft.limites[el.dataset.lim]; }); }
 function syncForm(){ document.querySelectorAll('#ov [data-ff]').forEach(el=>{ ui.form[el.dataset.ff]=el.value; }); document.querySelectorAll('#ov [data-ffb]').forEach(el=>{ ui.form[el.dataset.ffb]=el.checked; }); }
 function openEdit(tab){ ui.draft = JSON.parse(JSON.stringify(S)); ui.draft.ajustes[mk()] = ui.draft.ajustes[mk()] || {}; ui.tab = tab||'renda'; ui.modal='edit'; render(); }
-function openModal(name, form, tab){ ui.form = form; if(tab) ui.addTab = tab; ui.modal=name; render(); setTimeout(()=>{ const i=$('#fValor'); i&&i.focus(); },40); }
+function openModal(name, form, tab){ ui.form = form; if(tab) ui.addTab = tab; ui.modal=name; render(); setTimeout(()=>{ const i=$('#fValor'); const ae=document.activeElement; if(i && (!ae || ae===document.body || !document.getElementById('ov').contains(ae))) i.focus(); },40); }
 function clampDia(d){ d=Math.round(d); return Math.min(31,Math.max(1,d||1)); }
 function setPadrao(v){
   const V = VIDX(); S.renda.hist = (S.renda.hist||[]).filter(h=>h.desde<V);
@@ -881,6 +922,7 @@ document.addEventListener('input', e=>{
   if(el.id==='busca'){ ui.q=el.value; rebuild(); const t=$('#txl'); if(t) t.innerHTML=lancListHTML(calc(VIDX())); const ch=document.querySelector('#sec-lanc .chips'); if(ch) ch.style.display=ui.q?'none':''; const qc=document.querySelector('[data-qclear]'); if(qc) qc.style.display=ui.q?'':'none'; return; }
   if(ui.form && el.dataset.ff){ ui.form[el.dataset.ff]=el.value; const h=document.getElementById('fhint'); if(h) h.innerHTML=hintHTML(ui.form); }
 });
+document.addEventListener('toggle', e=>{ if(e.target.classList && e.target.classList.contains('fut')) ui.futOpen = e.target.open; }, true);
 document.addEventListener('change', e=>{ const el=e.target; if(el.hasAttribute && el.hasAttribute('data-catsel') && el.value==='__nova'){ const prevVal = el.dataset.ff ? (ui.form&&ui.form.cat) : null; ui.catTarget = el.dataset.ff ? {kind:'ff'} : {kind:'a', path:el.dataset.a}; if(el.dataset.ff){ el.value = prevVal || 'Outros'; } else { el.value = 'Outros'; } openCat(null); return; } if(el.id==='fRestore' && el.files && el.files[0]){ restaurar(el.files[0]); return; } if(ui.modal && el.dataset.rerender!==undefined){ syncForm(); render(); } });
 document.addEventListener('click', e=>{
   const b = e.target.closest('button'); if(!b) { if(e.target.id==='ov'){ ui.modal=null; render(); } return; }

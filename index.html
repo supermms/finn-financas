@@ -182,8 +182,7 @@ main{display:flex;flex-direction:column;gap:16px;min-width:0}
  .tabbar button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10.5px;color:var(--muted);padding:4px 0}
  .tabbar button span{font-size:19px;filter:grayscale(1);opacity:.6}
  .tabbar button.on{color:var(--blue);font-weight:600}.tabbar button.on span{filter:none;opacity:1}
- .app{padding-bottom:84px}
- .toast{bottom:84px}
+ .toast{bottom:calc(84px + env(safe-area-inset-bottom))}
 }
 @media(max-width:1180px){.grid{grid-template-columns:1fr 1fr}.span3{grid-column:span 2}.hide-md{display:none}}
 @media(max-width:860px){
@@ -193,6 +192,7 @@ main{display:flex;flex-direction:column;gap:16px;min-width:0}
   .illo{width:62px;height:62px;font-size:38px}.top .btn .t{display:none}
   .erow.casa{grid-template-columns:1fr 92px 30px;row-gap:6px}.erow.casa .w,.erow.casa .d,.erow.casa .mo{grid-row:2}.erow.head.casa{display:none}
 }
+@media(max-width:860px){.app{padding-bottom:calc(96px + env(safe-area-inset-bottom))}}
 </style>
 </head>
 <body>

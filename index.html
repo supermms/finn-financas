@@ -209,6 +209,11 @@ select.in{min-height:42px;text-overflow:ellipsis}
 }
 /* iOS: campos com fonte < 16px fazem o Safari dar zoom ao focar */
 @media(max-width:860px){ input,select,textarea,.in,.search input{font-size:16px!important} .bigin{font-size:30px!important} }
+.emogrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:4px}
+.emogrid button{height:40px;border-radius:10px;font-size:20px;border:1.5px solid transparent;background:var(--panel2)}
+.emogrid button.on{border-color:var(--blue);background:var(--blue-l)}
+.swatch{width:30px;height:30px;border-radius:50%;border:3px solid transparent;box-shadow:0 0 0 1px var(--line)}
+.swatch.on{border-color:var(--panel);box-shadow:0 0 0 2px var(--text)}
 </style>
 </head>
 <body>
@@ -271,8 +276,12 @@ const metodoLabel = m => METODOS[m]?.l || (cardById(m) ? cname(cardById(m)) : 'C
 const salPadrao = (idx, st) => { st=st||S; const h=(st.renda.hist||[]).filter(x=>x.desde<=idx).sort((a,b)=>a.desde-b.desde).pop(); return h ? h.valor : st.renda.salario; };
 
 const CATS = {Moradia:{c:'#1e3a8a',i:'🏠'}, Mercado:{c:'#0ea5e9',i:'🛒'}, Alimentação:{c:'#f97316',i:'🍽️'}, Transporte:{c:'#f59e0b',i:'🚗'}, Compras:{c:'#a855f7',i:'🛍️'}, Saúde:{c:'#14b8a6',i:'💊'}, Lazer:{c:'#ec4899',i:'🎉'}, Educação:{c:'#8b5cf6',i:'🎓'}, Assinaturas:{c:'#64748b',i:'📺'}, Família:{c:'#f43f6b',i:'👨‍👩‍👧'}, Reserva:{c:'#16a34a',i:'🐷'}, Outros:{c:'#94a3b8',i:'📦'}, 'Fatura (fora do app)':{c:'#2563eb',i:'💳'}};
-const CATLIST = Object.keys(CATS).filter(k=>!k.includes('('));
-const catOf = k => CATS[k] || CATS.Outros;
+const CAT_EMOJIS = ['🐶','🐱','💄','💇','👕','👟','🎁','🎂','✈️','🏖️','⛽','🅿️','🚌','🚇','📱','💻','🎮','📚','✏️','⚽','🏋️','🧘','🍺','☕','🍕','🥦','🧹','🛠️','💡','🧾','💸','🏦','👶','🧸','⛪','❤️','🌱','🎵','🎬','📦'];
+const CAT_CORES = ['#ef4444','#f97316','#f59e0b','#84cc16','#10b981','#06b6d4','#3b82f6','#6366f1','#a855f7','#ec4899','#78716c','#64748b'];
+S.categorias = S.categorias || []; S.catOcultas = S.catOcultas || [];
+const isBuiltin = k => !!CATS[k];
+const catList = () => [...Object.keys(CATS).filter(k=>!k.includes('(') && !S.catOcultas.includes(k)), ...S.categorias.map(c=>c.nome)];
+const catOf = k => CATS[k] || (()=>{ const c=S.categorias.find(x=>x.nome===k); return c ? {c:c.c, i:c.i} : CATS.Outros; })();
 
 /* ---- recurring + all gastos ---- */
 function G(){
@@ -623,13 +632,13 @@ function proxHTML(V){
 }
 
 /* ---------- modals ---------- */
-const catSel = (attr, v) => `<select class="in" ${attr}>${CATLIST.map(k=>`<option value="${k}" ${k===v?'selected':''}>${catOf(k).i} ${k}</option>`).join('')}</select>`;
+const catSel = (attr, v) => { const l = catList(); if(v && !l.includes(v)) l.push(v); return `<select class="in" ${attr} data-catsel>${l.map(k=>`<option value="${esc(k)}" ${k===v?'selected':''}>${catOf(k).i} ${esc(k)}</option>`).join('')}<option value="__nova">＋ Nova categoria…</option></select>`; };
 const valorBig = (ff, val, ph) => `<div style="display:flex;align-items:center;gap:6px;border-bottom:2px solid var(--line)"><span style="font-size:22px;font-weight:700;color:var(--soft)">R$</span><input class="bigin" id="fValor" data-ff="${ff}" inputmode="numeric" pattern="[0-9]*" data-money autocomplete="off" placeholder="${ph||'0,00'}" value="${esc(val)}"></div>`;
 const metodoChips = sel => [...Object.entries(METODOS).map(([id,m])=>({id, l:m.i+' '+m.l})), ...S.cartoes.map(c=>({id:c.id, l:'💳 '+cname(c)}))].map(m=>`<button class="chipb ${sel===m.id?'on':''}" data-pm="${m.id}">${esc(m.l)}</button>`).join('');
-function modalHTML(){ return ui.modal==='edit'?editHTML():ui.modal==='add'?addHTML():ui.modal==='mes'?mesHTML():ui.modal==='conta'?contaHTML():ui.modal==='rec'?recModalHTML():''; }
+function modalHTML(){ if(ui.modal==='cat') return catModalHTML(); return ui.modal==='edit'?editHTML():ui.modal==='add'?addHTML():ui.modal==='mes'?mesHTML():ui.modal==='conta'?contaHTML():ui.modal==='rec'?recModalHTML():''; }
 function editHTML(){
   const D = ui.draft, t = ui.tab, K = mk();
-  const tabs = [['renda','Renda'],['contas','Contas fixas'],['cartoes','Cartões'],['recorrentes','Recorrentes'],['limites','Limites'],['backup','Backup']];
+  const tabs = [['renda','Renda'],['contas','Contas fixas'],['cartoes','Cartões'],['recorrentes','Recorrentes'],['categorias','Categorias'],['limites','Limites'],['backup','Backup']];
   let body = '';
   if(t==='renda') body = `${!S.nome?'<div class="hint" style="margin-bottom:14px">👋 Bem-vinda! Comece pelo seu nome e salário. Depois cadastre seus cartões e contas fixas nas outras abas.</div>':''}
     <label class="fld"><span>Seu nome</span><input class="in" data-f="nome" value="${esc(D.nome)}"></label>
@@ -660,13 +669,50 @@ function editHTML(){
     <p class="lbl" style="margin-bottom:14px">Último backup: <b>${S.ultimoBackup ? S.ultimoBackup.split('-').reverse().join('/') : 'nunca'}</b></p>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-backup>⬇ Fazer backup agora</button><label class="btn ghost" style="cursor:pointer">⬆ Restaurar backup<input type="file" accept="application/json,.json" id="fRestore" hidden></label></div>
     <p class="lbl" style="margin-top:14px">Restaurar substitui os dados atuais deste aparelho pelos do arquivo.</p>`;
+  if(t==='categorias') body = `<button class="btn sm" style="margin-bottom:12px" data-catnew>＋ Nova categoria</button>
+    ${S.categorias.length?`<div class="lbl" style="font-weight:600;margin:4px 0">Suas categorias</div>`+S.categorias.map(c=>`<button class="tx" data-catedit="${esc(c.nome)}"><span class="ic" style="background:${c.c}22">${c.i}</span><span class="n"><b>${esc(c.nome)}</b><small>toque pra editar ou excluir</small></span><span class="dot" style="background:${c.c};width:12px;height:12px"></span></button>`).join(''):''}
+    <div class="lbl" style="font-weight:600;margin:14px 0 4px">Categorias padrão</div>
+    ${Object.keys(CATS).filter(k=>!k.includes('(')).map(k=>{ const off=S.catOcultas.includes(k); return `<div class="it" style="${off?'opacity:.5':''}"><span style="font-size:17px;width:24px;text-align:center">${CATS[k].i}</span><span class="n">${k}</span>${k==='Outros'?'<span class="lbl">sempre visível</span>':`<button class="btn ghost sm" data-chide="${k}">${off?'Mostrar':'Ocultar'}</button>`}</div>`; }).join('')}
+    <p class="lbl" style="margin-top:10px">Categorias ocultas não aparecem na lista ao lançar, mas lançamentos antigos continuam com elas.</p>`;
   if(t==='limites') body = `<p class="lbl" style="margin-bottom:10px">Defina quanto quer gastar no máximo por mês em cada categoria. Deixe em branco pra não ter limite. Você recebe um aviso ao chegar em 80% e ao passar do limite.</p>` +
-    CATLIST.map(k=>`<div class="erow" style="grid-template-columns:1fr 130px"><span>${catOf(k).i} ${k}</span><input class="in" inputmode="numeric" pattern="[0-9]*" data-money autocomplete="off" placeholder="sem limite" data-lim="${k}" value="${D.limites[k]?fmtN(D.limites[k]):''}"></div>`).join('');
+    catList().map(k=>`<div class="erow" style="grid-template-columns:1fr 130px"><span>${catOf(k).i} ${esc(k)}</span><input class="in" inputmode="numeric" pattern="[0-9]*" data-money autocomplete="off" placeholder="sem limite" data-lim="${k}" value="${D.limites[k]?fmtN(D.limites[k]):''}"></div>`).join('');
   return `<div class="modal" role="dialog" aria-label="Ajustes">
     <div class="mh"><b>Ajustes</b><button class="x" data-close aria-label="Fechar">×</button></div>
     <div class="mtabs">${tabs.map(([k,l])=>`<button data-tab="${k}" class="${k===t?'on':''}">${l}</button>`).join('')}</div>
     <div class="mb">${body}</div>
     <div class="mf"><button class="btn ghost" data-close>Cancelar</button><button class="btn" data-savedraft>Salvar</button></div></div>`;
+}
+function catModalHTML(){
+  const f = ui.form, editing = !!f.orig;
+  return `<div class="modal" role="dialog" aria-label="Categoria" style="max-width:480px">
+    <div class="mh"><b>${editing?'Editar categoria':'Nova categoria'}</b><button class="x" data-catcancel aria-label="Fechar">×</button></div>
+    <div class="mb">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px"><span class="ic" style="width:48px;height:48px;border-radius:14px;display:grid;place-items:center;font-size:26px;background:${f.c}22;border:2px solid ${f.c}">${f.i}</span><b style="font-size:17px">${esc(f.cnome||'Nome da categoria')}</b></div>
+      <label class="fld"><span>Nome</span><input class="in" data-ff="cnome" maxlength="28" placeholder="Ex.: Pet, Beleza, Viagem" value="${esc(f.cnome)}"></label>
+      <div class="fld"><span>Ícone</span><div class="emogrid">${CAT_EMOJIS.map(e=>`<button class="${f.i===e?'on':''}" data-cemo="${e}">${e}</button>`).join('')}</div>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:6px"><span class="lbl">ou digite um emoji:</span><input class="in" style="width:70px;text-align:center" data-ff="iDig" maxlength="4" value=""></label></div>
+      <div class="fld"><span>Cor</span><div style="display:flex;gap:8px;flex-wrap:wrap">${CAT_CORES.map(c=>`<button class="swatch ${f.c===c?'on':''}" style="background:${c}" data-ccor="${c}" aria-label="Cor ${c}"></button>`).join('')}</div></div>
+    </div>
+    <div class="mf">${editing?'<button class="btn ghost" style="color:var(--pink)" data-catdel>Excluir</button>':''}<button class="btn ghost" data-catcancel>Cancelar</button><button class="btn" data-catsave>Salvar</button></div></div>`;
+}
+function openCat(orig){
+  if(ui.modal==='add'||ui.modal==='rec'||ui.modal==='conta'||ui.modal==='mes') syncForm(); if(ui.modal==='edit') syncDraft();
+  ui.prev = {modal:ui.modal, form:ui.form, addTab:ui.addTab, tab:ui.tab};
+  const c = orig ? S.categorias.find(x=>x.nome===orig) : null;
+  ui.form = c ? {orig:c.nome, cnome:c.nome, i:c.i, c:c.c} : {orig:null, cnome:'', i:CAT_EMOJIS[S.categorias.length % CAT_EMOJIS.length], c:CAT_CORES[S.categorias.length % CAT_CORES.length]};
+  ui.modal='cat'; render(); setTimeout(()=>{ const i=document.querySelector('#ov [data-ff=cnome]'); i&&i.focus(); },40);
+}
+function closeCat(novoNome){
+  const pv = ui.prev || {}; ui.prev = null;
+  ui.modal = pv.modal || null; ui.form = pv.form || null; ui.addTab = pv.addTab || ui.addTab; ui.tab = pv.tab || ui.tab;
+  if(novoNome && ui.catTarget){ const t=ui.catTarget; if(t.kind==='ff' && ui.form) ui.form.cat=novoNome; else if(t.kind==='a' && ui.draft) setPath(ui.draft, t.path, novoNome); }
+  ui.catTarget = null; render();
+}
+function renameCatEverywhere(oldN, newN){
+  const fix = arr => (arr||[]).forEach(x=>{ if(x.cat===oldN) x.cat=newN; });
+  [S, ui.draft].filter(Boolean).forEach(st=>{ fix(st.gastos); fix(st.recorrentes); fix(st.contas);
+    if(st.limites && st.limites[oldN]!=null){ if(newN!=='Outros') st.limites[newN]=st.limites[oldN]; delete st.limites[oldN]; } });
+  if(ui.prev && ui.prev.form && ui.prev.form.cat===oldN) ui.prev.form.cat=newN;
 }
 function newForm(){
   const d = VIDX()===TODAY_IDX ? todayStr : `${ui.y}-${pad(ui.m+1)}-01`;
@@ -833,10 +879,28 @@ document.addEventListener('input', e=>{
   if(el.id==='busca'){ ui.q=el.value; rebuild(); const t=$('#txl'); if(t) t.innerHTML=lancListHTML(calc(VIDX())); const ch=document.querySelector('#sec-lanc .chips'); if(ch) ch.style.display=ui.q?'none':''; const qc=document.querySelector('[data-qclear]'); if(qc) qc.style.display=ui.q?'':'none'; return; }
   if(ui.form && el.dataset.ff){ ui.form[el.dataset.ff]=el.value; const h=document.getElementById('fhint'); if(h) h.innerHTML=hintHTML(ui.form); }
 });
-document.addEventListener('change', e=>{ const el=e.target; if(el.id==='fRestore' && el.files && el.files[0]){ restaurar(el.files[0]); return; } if(ui.modal && el.dataset.rerender!==undefined){ syncForm(); render(); } });
+document.addEventListener('change', e=>{ const el=e.target; if(el.hasAttribute && el.hasAttribute('data-catsel') && el.value==='__nova'){ const prevVal = el.dataset.ff ? (ui.form&&ui.form.cat) : null; ui.catTarget = el.dataset.ff ? {kind:'ff'} : {kind:'a', path:el.dataset.a}; if(el.dataset.ff){ el.value = prevVal || 'Outros'; } else { el.value = 'Outros'; } openCat(null); return; } if(el.id==='fRestore' && el.files && el.files[0]){ restaurar(el.files[0]); return; } if(ui.modal && el.dataset.rerender!==undefined){ syncForm(); render(); } });
 document.addEventListener('click', e=>{
   const b = e.target.closest('button'); if(!b) { if(e.target.id==='ov'){ ui.modal=null; render(); } return; }
   const d = b.dataset;
+  if(d.catnew!==undefined){ ui.catTarget=null; openCat(null); return; }
+  if(d.catedit){ ui.catTarget=null; openCat(d.catedit); return; }
+  if(d.cemo){ syncForm(); ui.form.i=d.cemo; render(); return; }
+  if(d.ccor){ syncForm(); ui.form.c=d.ccor; render(); return; }
+  if(d.catcancel!==undefined){ closeCat(null); return; }
+  if(d.catsave!==undefined){ syncForm(); const f=ui.form; const nome=(f.cnome||'').trim().replace(/[()]/g,'');
+    if(f.iDig && f.iDig.trim()) f.i = [...f.iDig.trim()].slice(0,2).join('');
+    if(!nome){ toast('Dê um nome pra categoria'); return; }
+    const taken = [...Object.keys(CATS), ...S.categorias.map(c=>c.nome)].some(k=>k.toLowerCase()===nome.toLowerCase() && k!==f.orig);
+    if(taken){ toast('Já existe uma categoria com esse nome'); return; }
+    const sync = st => { st.categorias = st.categorias || []; if(f.orig){ const c=st.categorias.find(x=>x.nome===f.orig); if(c){ c.nome=nome; c.i=f.i; c.c=f.c; } } else st.categorias.push({nome, i:f.i, c:f.c}); };
+    sync(S); if(ui.draft) sync(ui.draft);
+    if(f.orig && f.orig!==nome) renameCatEverywhere(f.orig, nome);
+    toast(f.orig?'Categoria atualizada':`Categoria “${esc(nome)}” criada`); closeCat(f.orig?null:nome); changed(); return; }
+  if(d.catdel!==undefined){ const nome=ui.form.orig; if(!confirm(`Excluir “${nome}”? Os lançamentos dela vão para “Outros”.`)) return;
+    renameCatEverywhere(nome, 'Outros'); [S, ui.draft].filter(Boolean).forEach(st=>{ st.categorias=(st.categorias||[]).filter(x=>x.nome!==nome); });
+    toast('Categoria excluída'); closeCat(null); changed(); return; }
+  if(d.chide){ const k=d.chide; [S, ui.draft].filter(Boolean).forEach(st=>{ st.catOcultas=st.catOcultas||[]; const i=st.catOcultas.indexOf(k); if(i>=0) st.catOcultas.splice(i,1); else st.catOcultas.push(k); }); render(); changed(); return; }
   if(d.mon){ goMonth(VIDX() + +d.mon); render(); return; }
   if(d.hoje!==undefined){ goMonth(TODAY_IDX); render(); return; }
   if(d.goto){ goMonth(+d.goto); goView('visao-geral'); return; }
@@ -918,9 +982,10 @@ document.addEventListener('click', e=>{
     ui.modal=null; toast(i>=0?'Gasto atualizado':'Gasto lançado'); changed(); limiteAvisoG(g); return; }
 });
 document.addEventListener('keydown', e=>{
+  if(e.key==='Escape'&&ui.modal==='cat'){ closeCat(null); return; }
   if(e.key==='Escape'&&ui.modal){ ui.modal=null; ui.draft=null; render(); return; }
   if(e.key!=='Enter'||e.target.tagName!=='INPUT'||e.target.id==='busca') return;
-  const sel = ui.modal==='mes' && /eDesc|eValor/.test(e.target.dataset.ff||'') ? '[data-eadd]' : ui.modal==='conta' ? '[data-csave]' : ui.modal==='rec' ? '[data-rsave]' : ui.modal==='add' ? '[data-addsave]:not([data-addsave=more])' : null;
+  const sel = ui.modal==='cat' ? '[data-catsave]' : ui.modal==='mes' && /eDesc|eValor/.test(e.target.dataset.ff||'') ? '[data-eadd]' : ui.modal==='conta' ? '[data-csave]' : ui.modal==='rec' ? '[data-rsave]' : ui.modal==='add' ? '[data-addsave]:not([data-addsave=more])' : null;
   if(sel){ e.preventDefault(); const b=document.querySelector('#ov '+sel); b&&b.click(); }
 });
 let rw; addEventListener('resize',()=>{ clearTimeout(rw); rw=setTimeout(()=>{ if(!ui.modal) render(); },200); });

@@ -362,7 +362,7 @@ function calc(V){
   Object.entries(S.limites).forEach(([k,l])=>{ if(+l>0 && !pc[k]) cats.push({k,v:0,lim:+l}); });
   // per day
   const dIn = dim(V); let cartaoHoje=0, porDia=null, diasRest=0, gastoHoje=0, restaHoje=null, estado;
-  if(V===TODAY_IDX){ diasRest = dIn - today.getDate() + 1; gastoHoje = r2(avItems.filter(x=>x.g.data===todayStr).reduce((a,b)=>a+b.v,0)); porDia = r2((saldo + gastoHoje)/diasRest); cartaoHoje = r2(GL.filter(g=>g.data===todayStr && isCardM(g.metodo)).reduce((a,b)=>a+b.valor,0)); restaHoje = r2(porDia - gastoHoje); estado='atual'; }
+  if(V===TODAY_IDX){ diasRest = dIn - today.getDate() + 1; gastoHoje = r2(avItems.filter(x=>x.g.data===todayStr).reduce((a,b)=>a+b.v,0)); porDia = r2(saldo/diasRest); cartaoHoje = r2(GL.filter(g=>g.data===todayStr && isCardM(g.metodo)).reduce((a,b)=>a+b.valor,0)); restaHoje = r2(porDia - gastoHoje); estado='atual'; }
   else if(V>TODAY_IDX){ diasRest = dIn; porDia = r2(saldo/dIn); estado='futuro'; }
   else estado='passado';
   const contasAll = [
@@ -563,7 +563,7 @@ function render(){
     ? `<div class="pd"><div class="lbl">Mês encerrado</div><b class="${c.saldo>=0?'pos':'neg'}" style="font-size:20px">${c.saldo>=0?'Sobrou':'Faltou'} ${fmt(Math.abs(c.saldo))}</b></div>`
     : `<div class="pd"><div class="lbl">${c.estado==='atual'?'Pode gastar por dia até o fim do mês':'Por dia, se nada mudar'}</div>
         <div style="font-size:28px;font-weight:800;letter-spacing:-.02em;color:${c.receita?pdCol:'var(--muted)'}">${c.porDia<=0?'R$ 0,00':fmt(c.porDia)}<span class="lbl" style="font-size:12px;font-weight:500"> /dia</span></div>
-        <div class="lbl">${c.diasRest} dia${c.diasRest>1?'s':''} ${c.estado==='atual'?'restantes (contando hoje)':'no mês'}${c.estado==='atual'?` · hoje: gastou ${fmt(c.gastoHoje)} no Pix/débito, ${c.restaHoje>=0?`ainda pode <b class="pos">${fmt(c.restaHoje)}</b>`:`passou <b class="neg">${fmt(-c.restaHoje)}</b>`}`:''}</div>
+        <div class="lbl">${c.diasRest} dia${c.diasRest>1?'s':''} ${c.estado==='atual'?'restantes (contando hoje)':'no mês'}${c.estado==='atual'&&c.gastoHoje?` · hoje você já gastou ${fmt(c.gastoHoje)} no Pix/débito`:''}</div>
         ${c.porDia<=0&&c.receita>0?'<div class="lbl neg" style="margin-top:4px">Os gastos já passaram da renda deste mês.</div>':''}${!c.receita?'<div class="lbl" style="margin-top:4px">Cadastre seu salário em Ajustes → Renda.</div>':''}${c.estado==='atual'&&c.cartaoHoje?`<div class="lbl" style="margin-top:4px">💳 ${fmt(c.cartaoHoje)} no cartão hoje — entra nas próximas faturas.</div>`:''}</div>`;
 
   $('#root').innerHTML = `

@@ -223,6 +223,17 @@ details.fut>summary{cursor:pointer;list-style:none;color:var(--muted)}
 details.fut>summary::-webkit-details-marker{display:none}
 details.fut>summary span:before{content:"▸ ";display:inline-block;transition:.15s}
 details.fut[open]>summary span:before{content:"▾ "}
+.sugs{border:1px solid var(--line);border-radius:12px;margin-top:6px;overflow:hidden;background:var(--panel)}
+.sug{display:flex;align-items:stretch;border-bottom:1px solid var(--line)}
+.sug:last-child{border-bottom:0}
+.sug-main{flex:1;display:flex;gap:10px;align-items:center;padding:9px 10px;text-align:left;min-width:0}
+.sug-main:active,.sug-main:hover{background:var(--panel2)}
+.sug-ic{font-size:18px;width:24px;text-align:center;flex:none}
+.sug-main .n{min-width:0;flex:1}
+.sug-main b{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sug-main small{display:block;color:var(--muted);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sug-pin{width:46px;flex:none;font-size:19px;color:#e0a800;border-left:1px solid var(--line)}
+.chipb.atalho .lbl{font-size:11.5px;margin-left:2px}
 </style>
 </head>
 <body>
@@ -578,6 +589,7 @@ function render(){
       <button class="nav" data-edit="cartoes">${ICON.card}Cartões</button>
       <button class="nav" data-edit="recorrentes">${ICON.rep}Recorrentes</button>
       <button class="nav" data-edit="limites">${ICON.gauge}Limites</button>
+      <button class="nav" data-edit="atalhos">${ICON.rep}Atalhos</button>
       <button class="nav" data-edit="backup">${ICON.rec}Backup</button>
       <div class="grow"></div>
       <div class="themebox"><span>☼ Tema</span><div class="seg"><button data-theme="light" class="${theme==='light'?'on':''}">☀︎</button><button data-theme="dark" class="${theme==='dark'?'on':''}">☾</button></div></div>
@@ -693,7 +705,7 @@ const metodoChips = sel => [...Object.entries(METODOS).map(([id,m])=>({id, l:m.i
 function modalHTML(){ if(ui.modal==='cat') return catModalHTML(); return ui.modal==='edit'?editHTML():ui.modal==='add'?addHTML():ui.modal==='mes'?mesHTML():ui.modal==='conta'?contaHTML():ui.modal==='rec'?recModalHTML():''; }
 function editHTML(){
   const D = ui.draft, t = ui.tab, K = mk();
-  const tabs = [['renda','Renda'],['contas','Contas fixas'],['cartoes','Cartões'],['recorrentes','Recorrentes'],['categorias','Categorias'],['limites','Limites'],['backup','Backup']];
+  const tabs = [['renda','Renda'],['contas','Contas fixas'],['cartoes','Cartões'],['recorrentes','Recorrentes'],['categorias','Categorias'],['atalhos','Atalhos'],['limites','Limites'],['backup','Backup']];
   let body = '';
   if(t==='renda') body = `${!S.nome?'<div class="hint" style="margin-bottom:14px">👋 Bem-vinda! Comece pelo seu nome e salário. Depois cadastre seus cartões e contas fixas nas outras abas.</div>':''}
     <label class="fld"><span>Seu nome</span><input class="in" data-f="nome" value="${esc(D.nome)}"></label>
@@ -724,6 +736,8 @@ function editHTML(){
     <p class="lbl" style="margin-bottom:14px">Último backup: <b>${S.ultimoBackup ? S.ultimoBackup.split('-').reverse().join('/') : 'nunca'}</b></p>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-backup>⬇ Fazer backup agora</button><label class="btn ghost" style="cursor:pointer">⬆ Restaurar backup<input type="file" accept="application/json,.json" id="fRestore" hidden></label></div>
     <p class="lbl" style="margin-top:14px">Restaurar substitui os dados atuais deste aparelho pelos do arquivo.</p>`;
+  if(t==='atalhos') body = `<p class="lbl" style="margin-bottom:10px">Atalhos aparecem no topo do “+ Gasto”: um toque preenche descrição, valor, categoria e forma de pagamento. Pra criar, toque na ☆ de uma sugestão enquanto digita a descrição.</p>` +
+    (S.atalhos.length ? S.atalhos.map((a,i)=>`<div class="it"><span style="font-size:17px;width:24px;text-align:center">${catOf(a.cat).i}</span><span class="n">${esc(a.descricao)}<div class="lbl">${esc(a.cat)} · ${esc(metodoLabel(a.metodo))} · ${fmt(a.valor)}</div></span>${i>0?`<button class="x" data-atup="${i}" aria-label="Subir">↑</button>`:''}<button class="x" data-atdel="${i}" aria-label="Remover">×</button></div>`).join('') : '<div class="empty">Nenhum atalho ainda.</div>');
   if(t==='categorias') body = `<button class="btn sm" style="margin-bottom:12px" data-catnew>＋ Nova categoria</button>
     ${S.categorias.length?`<div class="lbl" style="font-weight:600;margin:4px 0">Suas categorias</div>`+S.categorias.map(c=>`<button class="tx" data-catedit="${esc(c.nome)}"><span class="ic" style="background:${c.c}22">${c.i}</span><span class="n"><b>${esc(c.nome)}</b><small>toque pra editar ou excluir</small></span><span class="dot" style="background:${c.c};width:12px;height:12px"></span></button>`).join(''):''}
     <div class="lbl" style="font-weight:600;margin:14px 0 4px">Categorias padrão</div>
@@ -775,6 +789,44 @@ function newForm(){
   if(!METODOS[last] && !cardById(last)) last = 'pix';
   return {id:null, descricao:'', valor:'', data:d, cat:'Alimentação', metodo:last, parcelas:1, inicio:1, modo:'total', rep:false, nome:'', dia:''};
 }
+const normTxt = s => String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+S.atalhos = S.atalhos || [];
+const isPinned = g => S.atalhos.some(a=>normTxt(a.descricao)===normTxt(g.descricao) && a.metodo===g.metodo);
+function histSugs(q){
+  q = normTxt(q); if(!q) return [];
+  const m = new Map();
+  S.gastos.slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).forEach(g=>{ const k=normTxt(g.descricao); if(!k) return; const e=m.get(k); if(e){ e.n++; if(e.vals.length<3) e.vals.push(g.valor); } else m.set(k,{g, n:1, vals:[g.valor]}); });
+  m.forEach(e=>{ e.fixo = e.vals.every(v=>Math.abs(v-e.vals[0])<0.005); });
+  return [...m.entries()].filter(([k])=>k.includes(q)).sort((a,b)=> (b[0].startsWith(q)-a[0].startsWith(q)) || b[1].n-a[1].n).slice(0,5).map(([k,e])=>e);
+}
+function sugsHTML(f){
+  if(!f || f.id || ui.addTab!=='gasto') return '';
+  if(f.sugOk && normTxt(f.descricao)===normTxt(f.sugOk)) return '';
+  const list = histSugs(f.descricao); ui.sugList = list;
+  if(!list.length) return '';
+  return `<div class="sugs">${list.map((e,i)=>{ const g=e.g; return `<div class="sug"><button class="sug-main" data-sug="${i}"><span class="sug-ic">${catOf(g.cat).i}</span><span class="n"><b>${esc(g.descricao)}</b><small>${esc(g.cat)} · ${esc(metodoLabel(g.metodo))} · ${e.fixo?fmt(g.valor):'valor varia'}${e.n>1?` · ${e.n}x`:''}</small></span></button><button class="sug-pin" data-pinsug="${i}" aria-label="${isPinned(g)?'Remover dos atalhos':'Fixar como atalho'}">${isPinned(g)?'★':'☆'}</button></div>`; }).join('')}</div>`;
+}
+function atalhosHTML(f){
+  if(f.id) return '';
+  if(!S.atalhos.length) return S.gastos.length ? `<p class="lbl" style="margin:-4px 0 12px">Dica: toque na ☆ de uma sugestão pra criar atalhos dos gastos que você mais repete.</p>` : '';
+  return `<div class="fld"><span>Atalhos</span><div class="chips">${S.atalhos.map((a,i)=>`<button class="chipb atalho" data-atalho="${i}">${catOf(a.cat).i} ${esc(a.descricao)} <span class="lbl">${fmtN(a.valor)}</span></button>`).join('')}</div></div>`;
+}
+function applyTpl(t, withValor){
+  syncForm(); const f = ui.form;
+  f.descricao = t.descricao; f.sugOk = t.descricao;
+  if(catList().includes(t.cat) || S.categorias.some(c=>c.nome===t.cat) || CATS[t.cat]) f.cat = t.cat;
+  if(METODOS[t.metodo] || cardById(t.metodo)) f.metodo = t.metodo;
+  if(!cardById(f.metodo)){ f.parcelas=1; f.inicio=1; }
+  if(withValor) f.valor = fmtN(t.valor);
+  render();
+  if(!num(f.valor)) setTimeout(()=>{ const i=$('#fValor'); i&&i.focus(); },30);
+}
+function togglePin(g){
+  const i = S.atalhos.findIndex(a=>normTxt(a.descricao)===normTxt(g.descricao) && a.metodo===g.metodo);
+  if(i>=0){ S.atalhos.splice(i,1); toast('Removido dos atalhos'); }
+  else { if(S.atalhos.length>=12){ toast('Máximo de 12 atalhos — remova algum em Ajustes → Atalhos'); return; } S.atalhos.push({descricao:g.descricao, valor:g.valor, cat:g.cat, metodo:g.metodo}); toast('★ Atalho criado'); }
+}
+
 function hintHTML(f){
   const k = cardById(f.metodo), nP = +f.parcelas||1; let hint='';
   if(k && f.data){ const ini=Math.min(nP,Math.max(1,+f.inicio||1)); const d0 = dueIdx(k, f.data); const first=d0-(ini-1); const v = num(f.valor); const tot = f.modo==='parcela'? v*nP : v; const pv=Math.floor(tot/nP*100)/100;
@@ -785,9 +837,9 @@ function hintHTML(f){
 }
 function addHTML(){
   const f = ui.form, editing = !!f.id, k = cardById(f.metodo), nP = +f.parcelas||1;
-  const gastoBody = `
+  const gastoBody = `${atalhosHTML(f)}
       <label class="fld"><span>Valor</span>${valorBig('valor', f.valor)}</label>
-      <label class="fld"><span>Descrição</span><input class="in" data-ff="descricao" placeholder="Ex.: Mercado, Uber, almoço" value="${esc(f.descricao)}"></label>
+      <div class="fld"><label style="display:flex;flex-direction:column;gap:5px"><span>Descrição</span><input class="in" data-ff="descricao" placeholder="Ex.: Mercado, Uber, almoço" value="${esc(f.descricao)}" autocomplete="off"></label><div id="fsugs">${sugsHTML(f)}</div></div>
       <div class="fld"><span>Pagou com</span><div class="chips">${metodoChips(f.metodo)}</div></div>
       ${k?`<div class="two"><label class="fld"><span>Parcelas</span><select class="in" data-ff="parcelas" data-rerender>${Array.from({length:36},(_,i)=>`<option value="${i+1}" ${nP===i+1?'selected':''}>${i===0?'À vista':(i+1)+'x'}</option>`).join('')}</select></label>
       ${nP>1?`<label class="fld"><span>Parcela atual (na data)</span><select class="in" data-ff="inicio" data-rerender>${Array.from({length:nP},(_,i)=>`<option value="${i+1}" ${(+f.inicio||1)===i+1?'selected':''}>${i+1} de ${nP}</option>`).join('')}</select></label>`:'<span></span>'}</div>
@@ -932,7 +984,7 @@ document.addEventListener('input', e=>{
   const el=e.target;
   if(el.hasAttribute && el.hasAttribute('data-money')) maskMoney(el);
   if(el.id==='busca'){ ui.q=el.value; rebuild(); const t=$('#txl'); if(t) t.innerHTML=lancListHTML(calc(VIDX())); const ch=document.querySelector('#sec-lanc .chips'); if(ch) ch.style.display=ui.q?'none':''; const qc=document.querySelector('[data-qclear]'); if(qc) qc.style.display=ui.q?'':'none'; return; }
-  if(ui.form && el.dataset.ff){ ui.form[el.dataset.ff]=el.value; const h=document.getElementById('fhint'); if(h) h.innerHTML=hintHTML(ui.form); }
+  if(ui.form && el.dataset.ff){ ui.form[el.dataset.ff]=el.value; if(el.dataset.ff==='descricao'){ const sg=document.getElementById('fsugs'); if(sg) sg.innerHTML=sugsHTML(ui.form); } const h=document.getElementById('fhint'); if(h) h.innerHTML=hintHTML(ui.form); }
 });
 document.addEventListener('toggle', e=>{ if(e.target.classList && e.target.classList.contains('fut')) ui.futOpen = e.target.open; }, true);
 document.addEventListener('change', e=>{ const el=e.target; if(el.hasAttribute && el.hasAttribute('data-catsel') && el.value==='__nova'){ const prevVal = el.dataset.ff ? (ui.form&&ui.form.cat) : null; ui.catTarget = el.dataset.ff ? {kind:'ff'} : {kind:'a', path:el.dataset.a}; if(el.dataset.ff){ el.value = prevVal || 'Outros'; } else { el.value = 'Outros'; } openCat(null); return; } if(el.id==='fRestore' && el.files && el.files[0]){ restaurar(el.files[0]); return; } if(ui.modal && el.dataset.rerender!==undefined){ syncForm(); render(); } });
@@ -957,6 +1009,11 @@ document.addEventListener('click', e=>{
     renameCatEverywhere(nome, 'Outros'); [S, ui.draft].filter(Boolean).forEach(st=>{ st.categorias=(st.categorias||[]).filter(x=>x.nome!==nome); });
     toast('Categoria excluída'); closeCat(null); changed(); return; }
   if(d.chide){ const k=d.chide; [S, ui.draft].filter(Boolean).forEach(st=>{ st.catOcultas=st.catOcultas||[]; const i=st.catOcultas.indexOf(k); if(i>=0) st.catOcultas.splice(i,1); else st.catOcultas.push(k); }); render(); changed(); return; }
+  if(d.sug){ const e=(ui.sugList||[])[+d.sug]; if(e) applyTpl(e.g, e.fixo && !num((syncForm(),ui.form.valor))); return; }
+  if(d.pinsug){ const e=(ui.sugList||[])[+d.pinsug]; if(e){ syncForm(); togglePin(e.g); changed(); } return; }
+  if(d.atalho){ const a=S.atalhos[+d.atalho]; if(a) applyTpl(a, true); return; }
+  if(d.atdel){ const i=+d.atdel; [S, ui.draft].filter(Boolean).forEach(st=>{ (st.atalhos||[]).splice(i,1); }); toast('Atalho removido'); changed(); return; }
+  if(d.atup){ const i=+d.atup; if(i>0) [S, ui.draft].filter(Boolean).forEach(st=>{ const a=st.atalhos; [a[i-1],a[i]]=[a[i],a[i-1]]; }); changed(); return; }
   if(d.mon){ goMonth(VIDX() + +d.mon); render(); return; }
   if(d.hoje!==undefined){ goMonth(TODAY_IDX); render(); return; }
   if(d.goto){ goMonth(+d.goto); goView('visao-geral'); return; }
